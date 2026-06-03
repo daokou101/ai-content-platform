@@ -88,7 +88,8 @@
       "Bash(pdftotext \"/e/aSpringBoot_start01_0525/简历.pdf\" -)",
       "Bash(pip install *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }
