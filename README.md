@@ -178,7 +178,7 @@ npm run dev
 | POST | `/api/auth/login` | 登录 |
 | POST | `/api/auth/register` | 注册 |
 
-## 面试问答
+## 问答
 
 ### Q: 为什么用 SSE 而不是 WebSocket？
 SSE（Server-Sent Events）是单向的（服务端 → 客户端），适合 AI 生成这种服务端主动推送的场景。WebSocket 是双向的，适合聊天等需要双方通信的场景。SSE 基于 HTTP 协议，实现更简单，不需要额外依赖。前端使用 `EventSource` API，原生支持断线重连。
