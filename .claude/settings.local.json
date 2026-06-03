@@ -86,7 +86,9 @@
       "Read(//c/Users/LENOVO/**)",
       "Bash(docker exec *)",
       "Bash(pdftotext \"/e/aSpringBoot_start01_0525/简历.pdf\" -)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
