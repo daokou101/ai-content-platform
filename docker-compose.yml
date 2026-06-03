@@ -1,0 +1,137 @@
+# =============================================
+# AI 内容创作平台 - Docker Compose 编排
+#
+# 启动方式：
+#   docker compose up -d --build
+#
+# 停止方式：
+#   docker compose down
+#
+# 查看日志：
+#   docker compose logs -f
+#
+# 服务说明（5 个容器）：
+#   mysql       - 数据库
+#   redis       - 缓存 + 分布式锁
+#   rabbitmq    - 消息队列（通知推送）
+#   backend     - Spring Boot 后端
+#   frontend    - Nginx + Vue 前端
+# =============================================
+
+services:
+  # =============================================
+  # 1. MySQL 数据库
+  # =============================================
+  mysql:
+    image: mysql:8.0
+    container_name: ai-mysql
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --character-set-client-handshake=FALSE
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: smart_task
+    ports:
+      - "3307:3306"    # 映射到 3307 避免和本机 MySQL 冲突
+    volumes:
+      # 初始化脚本（建表 + 种子数据）
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # 持久化数据
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================
+  # 2. Redis 缓存
+  # =============================================
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"    # 映射到 6380 避免和本机 Redis 冲突
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # =============================================
+  # 3. RabbitMQ 消息队列
+  # =============================================
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ai-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5673:5672"    # AMQP 协议端口（映射到 5673 避免冲突）
+      - "15673:15672"  # 管理控制台端口
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # =============================================
+  # 4. Spring Boot 后端
+  # =============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      # 数据库配置 — 容器内使用服务名作为主机名
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/smart_task?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&serverTimezone=Asia/Shanghai&allowMultiQueries=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+      # Redis 配置
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # RabbitMQ 配置
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      # DeepSeek API 密钥（通过 .env 文件或系统环境变量设置）
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-your-key-here}
+    ports:
+      - "8081:8080"    # 映射到 8081 避免和本机 Spring Boot 冲突
+
+  # =============================================
+  # 5. Nginx 前端
+  # =============================================
+  frontend:
+    build:
+      context: ./ai-creator/frontend
+      dockerfile: Dockerfile
+    container_name: ai-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"        # 访问 http://localhost 即可打开前端页面
+
+# =============================================
+# 持久化卷（数据保存在 Docker 管理的卷中）
+# 在 Windows 上存储在：\\wsl$\docker-desktop-data\data\docker\volumes
+# =============================================
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:

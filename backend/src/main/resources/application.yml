@@ -1,0 +1,77 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/smart_task?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&serverTimezone=Asia/Shanghai&allowMultiQueries=true
+    username: root
+    password: 123456
+
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8   # 连接池最大连接数
+          max-idle: 4     # 连接池最大空闲连接
+          min-idle: 1     # 连接池最小空闲连接
+
+  # RabbitMQ配置
+  rabbitmq:
+    host: localhost
+    port: 5672
+    virtual-host: /
+    username: guest
+    password: guest
+    listener:
+      simple:
+        prefetch: 1       # 每次只处理一条消息，处理完再取下一个
+        concurrency: 3    # 最小消费者数
+        max-concurrency: 10 # 最大消费者数
+
+  # Jackson日期格式化
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+# MyBatis-Plus配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true # 数据库下划线转驼峰
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开发环境打印SQL日志
+  global-config:
+    db-config:
+      id-type: auto        # 主键自增
+      logic-delete-field: deleted  # 逻辑删除字段名
+      logic-delete-value: 1        # 逻辑已删除值
+      logic-not-delete-value: 0    # 逻辑未删除值
+
+# DeepSeek AI 配置
+deepseek:
+  # API 密钥，从 https://platform.deepseek.com/ 注册获取
+  # 建议通过环境变量 DEEPSEEK_API_KEY 设置，避免硬编码在配置文件中
+  api-key: ${DEEPSEEK_API_KEY:sk-your-key-here}
+  # API 基础地址，DeepSeek 的 API 地址
+  api-url: https://api.deepseek.com
+  # HTTP 读取超时时间（毫秒），AI 生成可能需要较长时间
+  timeout: 120000
+  # 默认使用的模型标识
+  model: deepseek-chat
+
+# JWT配置
+jwt:
+  secret: SmartTaskPlatform2024SecretKeyForJWTTokenGeneration!@#$%
+  expiration: 86400000     # 24小时，单位毫秒
+
+# 线程池配置
+thread-pool:
+  core-pool-size: 10       # 核心线程数
+  max-pool-size: 20        # 最大线程数
+  queue-capacity: 100      # 队列容量
+  keep-alive-seconds: 300  # 空闲线程存活时间
+  prefix: task-executor-   # 线程名前缀

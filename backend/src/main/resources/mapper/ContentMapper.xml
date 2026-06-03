@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+    ContentMapper 的 SQL 映射文件
+
+    namespace : 对应 Mapper 接口的全限定名，必须一致
+    MyBatis 通过 namespace + 标签 id 找到对应的 SQL：
+        比如 ContentMapper.selectContentVOList() → 执行下面 id="selectContentVOList" 的 <select>
+
+    resultMap : 定义查询结果如何映射到 Java 对象
+        当查询结果包含关联表字段（category_name, created_by_name）时，
+        普通 BaseMapper 的方法无法处理，需要自定义 resultMap
+-->
+<mapper namespace="com.smarttask.mapper.ContentMapper">
+
+    <!--
+        ContentVOMap 结果映射
+
+        告诉 MyBatis：SQL 查询出来的每一列对应 ContentVO 的哪个属性。
+
+        type="com.smarttask.vo.ContentVO" → 映射的目标类型
+        <id> → 主键映射（对 MyBatis 性能优化有帮助）
+        <result> → 普通列映射
+
+        property 和 column 的对应关系：
+            property="templateType" → Java 类的属性名（驼峰）
+            column="template_type"  → SQL 查询结果的列名（下划线）
+        如果开启了 map-underscore-to-camel-case（application.yml 中已配置），
+        像 title/keywords/status 这些名称一致的列可以不用显式映射，
+        但为了清晰可读，这里全部显式写出来了。
+
+        注意 category_name 和 created_by_name 这两个字段：
+            Content实体类中 没有 这两个字段，
+            ContentVO（继承 Content）中 有 这两个字段。
+    -->
+    <resultMap id="ContentVOMap" type="com.smarttask.vo.ContentVO">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="summary" property="summary"/>
+        <result column="content" property="content"/>
+        <result column="keywords" property="keywords"/>
+        <result column="template_type" property="templateType"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="status" property="status"/>
+        <result column="favorite" property="favorite"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="category_name" property="categoryName"/>
+        <result column="created_by_name" property="createdByName"/>
+    </resultMap>
+
+    <!--
+        查询内容 VO 列表（带分页支持）
+
+        用于 ContentService.getContentPage() 方法。
+        做了 3 个 LEFT JOIN 获取关联信息：
+            ai_content_category → 获取分类名称
+            sys_user           → 获取创建者昵称
+
+        WHERE 条件：
+            c.deleted = 0  → 只查未删除的（逻辑删除过滤）
+
+        参数说明：
+            #{keyword}      → 关键词，模糊匹配标题或关键词字段
+                               CONCAT('%', #{keyword}, '%') 实现 LIKE %keyword%
+            #{templateType} → 模板类型筛选，精确匹配
+            #{userId}       → 当前用户，只查该用户创建的内容（数据隔离）
+
+        ORDER BY c.create_time DESC → 按创建时间倒序，最新的在最前面
+    -->
+    <select id="selectContentVOList" resultMap="ContentVOMap">
+        SELECT
+            c.*,
+            cat.name AS category_name,
+            u.nickname AS created_by_name
+        FROM ai_content c
+        LEFT JOIN ai_content_category cat ON c.category_id = cat.id AND cat.deleted = 0
+        LEFT JOIN sys_user u ON c.created_by = u.id
+        WHERE c.deleted = 0
+          AND c.created_by = #{userId}
+        <if test="keyword != null and keyword != ''">
+            AND (c.title LIKE CONCAT('%', #{keyword}, '%') OR c.keywords LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="templateType != null and templateType != ''">
+            AND c.template_type = #{templateType}
+        </if>
+        ORDER BY c.create_time DESC
+    </select>
+
+    <!--
+        查询单条内容 VO 详情
+
+        用于 ContentService.getContentDetail() 方法。
+        通过主键 id 查询单条记录及其关联信息。
+
+        参数 #{id} → 内容ID，来自 URL 路径中的 {id}
+    -->
+    <select id="selectContentVODetail" resultMap="ContentVOMap">
+        SELECT
+            c.*,
+            cat.name AS category_name,
+            u.nickname AS created_by_name
+        FROM ai_content c
+        LEFT JOIN ai_content_category cat ON c.category_id = cat.id AND cat.deleted = 0
+        LEFT JOIN sys_user u ON c.created_by = u.id
+        WHERE c.id = #{id} AND c.deleted = 0
+    </select>
+
+    <!--
+        统计用户今日生成的内容数
+
+        用于 DashboardService 的"今日生成"统计。
+        CURDATE() 是 MySQL 函数，返回当前日期 00:00:00。
+        所以条件等价于 create_time >= '2026-05-30 00:00:00'
+    -->
+    <select id="countTodayByUser" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM ai_content
+        WHERE created_by = #{userId}
+          AND deleted = 0
+          AND create_time >= CURDATE()
+    </select>
+
+    <!--
+        统计用户收藏的内容数
+
+        用于 DashboardService 的"收藏内容"统计。
+        favorite = 1 表示已收藏
+    -->
+    <select id="countFavoritesByUser" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM ai_content
+        WHERE created_by = #{userId}
+          AND deleted = 0
+          AND favorite = 1
+    </select>
+
+</mapper>
